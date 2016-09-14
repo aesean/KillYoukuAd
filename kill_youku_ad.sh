@@ -67,8 +67,8 @@ if [[ "$result" != "" ]]; then
     echo "已禁用优酷广告服务器，无需重复禁用"
 else
     if [ $UID -ne 0 ]; then
-        if [ !`expect -c 'set timeout 1; spawn sudo date; expect "Password" { exit 3; } interact' > /dev/null 2>&1` ]; then
-            echo -e "\033[31m需要超级用户权限，修改本地hosts文件，请输入操作系统登录密码。\033[0m"
+        if [ !`expect -c 'set timeout 1; spawn sudo date; expect "assword" { exit 3; } interact' > /dev/null 2>&1` ]; then
+            echo -e "\033[31m需要超级用户权限修改本地hosts文件，请输入操作系统登录密码。注意输入密码的时候，输入的字符是不会显示的，也不会显示星号。如果想要直接退出请按:Ctrl+C\033[0m"
         fi 
     fi
     # hosts需要su权限
