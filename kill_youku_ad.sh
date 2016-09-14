@@ -67,7 +67,9 @@ if [[ "$result" != "" ]]; then
     echo "已禁用优酷广告服务器，无需重复禁用"
 else
     if [ $UID -ne 0 ]; then
-        echo -e "\033[0m需要超级用户权限，修改本地hosts文件，可能需要输入操作系统登录密码：\033[0m"
+        if [ !`expect -c 'set timeout 1; spawn sudo date; expect "Password" { exit 3; } interact' > /dev/null 2>&1` ]; then
+            echo -e "\033[31m需要超级用户权限，修改本地hosts文件，请输入操作系统登录密码。\033[0m"
+        fi 
     fi
     # hosts需要su权限
     sudo bash -c 'echo "
@@ -89,7 +91,12 @@ else
 127.0.0.1       stat.youku.com
 #禁用优酷广告服务器End
 " >> /etc/hosts'
-    echo "禁用广告服务器成功"
+    if [ $? -ne 0 ]; then
+        echo -e "\033[31m禁用广告服务器失败！\033[0m"
+        exit 6
+    else
+        echo "禁用广告服务器成功"
+    fi
 fi
 
 echo -e "\033[32m所有操作完成，优酷广告已被清除。请打开Chrome测试效果。\033[0m"
