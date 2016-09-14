@@ -9,13 +9,8 @@
 # 2. 向hosts文件添加优酷广告服务器地址，并指向127.0.0.1
 # 仅支持Linux和macOS
 # Chrome 53 64位 macOS测试通过
-if [ $UID -ne 0 ]; then
-    echo -e "\033[31m失败！\033[0m需要超级用户权限，请在命令前加：\033[32msudo。\033[0m"
-    echo -e "例如： \"\033[32msudo $0\033[0m\""
-    exit 1
-fi
-
 os=`uname`
+# 不同的操作系统Chrome配置文件路径不同，这里判断Linux和Mac，然后取不同的配置路径。shell的变量作用域是全局的，所以这里可以在case里面定义prefixPath
 case $os in
     "Linux")
         prefixPath="$HOME/.config/google-chrome/"
@@ -30,38 +25,52 @@ case $os in
         ;;
 esac
 
+# 这里主要是避免文件夹名称带有空格，被forin分割的情况。
 IFS=$(echo -en "\n\b")
-for dir in `ls $prefixPath | grep -E "Default|Profile"`
+cd $prefixPath
+# 纪录下当前路径，待会儿需要切换回来
+currentDir=`pwd`
+# 这里默认处理Default文件夹就可以了，但是如果Chrome浏览器有登录Google帐号，而且帐号不止一个，这里就需要处理类似Profile 1，Profile 2等目录了。
+for dir in `ls . | grep -E "Default|Profile"`
 do
-    if [[ -d "$prefixPath$dir/Pepper Data/Shockwave Flash/WritableRoot/#SharedObjects/" ]]; then
-        findFile="$prefixPath$dir/Pepper Data/Shockwave Flash/WritableRoot/#SharedObjects/static.youku.com"
-        if [ -f $findFile ]; then
-            echo "发现static.youku.com文件"
-            echo "开始删除Chrome配置文件：static.youku.com"
-            # echo $findFile
-            rm -rf "$findFile"
+    # 如果存在类似Peppre Data这样的子目录，则基本判定是我们需要处理的目录。
+    if [[ -d "./$dir/Pepper Data/Shockwave Flash/WritableRoot/#SharedObjects/" ]]; then
+        cd "./$dir/Pepper Data/Shockwave Flash/WritableRoot/#SharedObjects/"
+        # 这里需要在当前目录的所有子目录里创建文件：static.youku.com
+        # 这里做遍历主要是实际测试，这里的子目录名称不确定，所以这里就比较暴力的遍历处理所有子目录。
+        for l in `ls .`
+        do
+            rm -rf "./$l/static.youku.com"
             if [ $? -eq 0 ]; then
-                echo "删除成功"
+                echo "删除Chrome配置文件：static.youku.com，成功"
             else
                 echo -e "\033[31m删除失败！\033[0m"
-                echo $findFile
+                echo "`pwd`/$l/static.youku.com"
                 echo -e "\033[31m禁用优酷广告失败！\033[0m"
                 exit 3
             fi
-        fi
-        echo "创建空文件：static.youku.com"
-        touch "$findFile"
-        echo "创建成功"
+            echo "创建空文件：static.youku.com"
+            touch "./$l/static.youku.com"
+            # 添加只读权限，防止死灰复燃
+            chmod 400 "./$l/static.youku.com"
+            echo "创建成功"
+        done
     fi
+    cd $currentDir
 done
 
 echo "开始禁用Youku广告服务器地址"
 hosts=`cat /etc/hosts`
+# 添加flag，标记自己添加的东西，方便做重复判断和后续删除。
 result=$(echo $hosts | grep "#禁用优酷广告服务器Start"  | grep "#禁用优酷广告服务器End")
 if [[ "$result" != "" ]]; then
     echo "已禁用优酷广告服务器，无需重复禁用"
 else
-    echo "
+    if [ $UID -ne 0 ]; then
+        echo -e "\033[0m需要超级用户权限，修改本地hosts文件，可能需要输入操作系统登录密码：\033[0m"
+    fi
+    # hosts需要su权限
+    sudo bash -c 'echo "
 #禁用优酷广告服务器Start
 127.0.0.1       atm.youku.com
 127.0.0.1       fvid.atm.youku.com
@@ -79,8 +88,9 @@ else
 127.0.0.1       urchin.lstat.youku.com
 127.0.0.1       stat.youku.com
 #禁用优酷广告服务器End
-" >> /etc/hosts
+" >> /etc/hosts'
     echo "禁用广告服务器成功"
 fi
 
 echo -e "\033[32m所有操作完成，优酷广告已被清除。请打开Chrome测试效果。\033[0m"
+exit 0
